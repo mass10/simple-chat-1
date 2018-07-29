@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html>
+	<head>
+
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width,initial-scale=1">
+		<title>peta2</title>
+
+		<!-- jQuery 3.x -->
+		<!-- script src="/js/jquery-3.1.1.min.js"></script -->
+		<script src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
+		<!-- Latest compiled and minified CSS -->
+		<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+		<!-- Optional theme -->
+		<!-- link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap-theme.min.css" integrity="sha384-rHyoN1iRsVXV4nD0JutlnGaslCJuC7uwjduW9SVrLvRYooPp2bWYgmgJQIXwl/Sp" crossorigin="anonymous" -->
+		<!-- Latest compiled and minified JavaScript -->
+		<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+		<!-- React 諦め中... -->
+		<!-- script src="https://unpkg.com/react@15/dist/react.min.js"></script -->
+		<!-- script src="https://unpkg.com/react-dom@15/dist/react-dom.min.js"></script -->
+		<!-- Socket.IO CDN -->
+		<script src="https://cdn.socket.io/socket.io-1.4.5.js"></script>
+		<!-- system css -->
+		<link rel="stylesheet" href="/static/css/common.css">
+
+		<script>
+
+		var _websocket = null;
+
+		var _dragging_start_position = null;
+
+		function _load_boxes() {
+
+			if ((console) && (console.log)) {
+				console.log("サーバーにメッセージを問い合わせています...");
+			}
+
+			var request = {
+				type: 'GET',
+				data: JSON.stringify({}),
+				contentType: 'application/json',
+				url: '/boxes',
+				success: function(data) {
+					$.each (data["data"], function(i, e) {
+						console.log("[message] " + JSON.stringify(e));
+						_paste_new_box(e);
+					});
+				}
+			}
+
+			$.ajax(request);
+		}
+
+		function _on_chat_message(m) {
+
+			console.log("[着信] " + JSON.stringify(m));
+
+			_paste_new_box(m);
+		}
+
+		function _on_session_changed(m) {
+
+			if ((console) && (console.log)) {
+				console.log("アクティブなユーザー数が変化しました。(" + m.count + ")");
+			}
+
+			$("#div-current-sessions").text("" + m.count + " session(s) alive.");
+		}
+
+		function _onload_document() {
+
+			{
+				$("#div-canvas").mousedown(_on_begindrag_canvas);
+				$("#div-canvas").mouseup(_on_dragend_canvas);
+			}
+
+			{
+				// Socket.IO による双方向通信を開始します。
+				_websocket = io();
+				// メッセージ受信(コメント貼り付け)
+				_websocket.on('chat message', _on_chat_message);
+				// セッション数の変化
+				_websocket.on('sessions changed', _on_session_changed);
+			}
+
+			{
+				_load_boxes();
+			}
+
+			{
+				// $('body').fadeIn(2000);
+			}
+		}
+
+		function _on_begindrag_canvas(e) {
+
+			if ((console) && (console.log)) {
+				console.log("ドラッグ操作が開始されました。");
+			}
+
+			canvas = $("#div-canvas");
+			if (canvas == null)
+				return;
+
+			_dragging_start_position = {
+				x: e.pageX - canvas.offset().left + canvas.scrollLeft(),
+				y: e.pageY - canvas.offset().top + canvas.scrollTop()
+			};
+
+			if ((console) && (console.log)) {
+				console.log("[CLICKED] " + JSON.stringify(_dragging_start_position));
+			}
+		}
+
+		function _show_inputbox() {
+
+			$("#myModal").modal("show");
+		}
+
+		function _on_dragend_canvas(e) {
+
+			if ((console) && (console.log)) {
+				console.log("ドラッグ操作が終了されました。");
+			}
+
+			if(_dragging_start_position == null)
+				return;
+			if (!_show_inputbox())
+				return;
+		}
+
+		function _onclick_text_cancel() {
+
+			if ((console) && (console.log)) {
+				console.log("[clicked] cancel");
+			}
+
+			_hide_inputbox();
+		}
+
+		function _hide_inputbox() {
+
+			$("#myModal").modal("hide");
+		}
+
+		function _pop_comment_value() {
+
+			var comment = $("#comment").val();
+			$("#comment").val("");
+			return comment;
+		}
+
+		function _broadcast_message(x, y, text) {
+
+			if (text == "")
+				return;
+			_websocket.emit('chat message', {x: x, y: y, text: text});
+		}
+
+		var _pooled = {};
+
+		function _onmouseover_box(e) {
+
+			if ((console) && (console.log)) {
+				console.log("[event][mouseover] " + JSON.stringify({text: e.currentTarget.innerHTML}));
+				// console.log(JSON.stringify(e));
+				// console.log(e.currentTarget);
+			}
+
+			var target = $(e.target);
+			// 枠をハイライト
+			// TODO: 要素自体を変更するのではなく、最前面に枠を表示したり消したりする方がよさそう。
+			target.css("border-width", "2px");
+			target.css("border-color", "#903030");
+			target.width(target.width() + 2);
+			target.height(target.height() + 2);
+			// 位置を調整
+			var current_position = target.offset();
+			target.offset({left: current_position.left - 1, top: current_position.top - 1});
+			// 最前面に移動
+			target.appendTo(target.parent());
+		}
+
+		function _onmouseout_box(e) {
+
+			if ((console) && (console.log)) {
+				console.log("[event][mouseout] " + JSON.stringify({text: e.currentTarget.innerHTML}));
+			}
+
+			var target = $(e.target);
+			// 枠をデフォルトに
+			target.css("border-width", "1px");
+			target.css("border-color", "#101010");
+			target.width(target.width() - 2);
+			target.height(target.height() - 2);
+			// 位置を調整
+			var current_position = target.offset();
+			target.offset({left: current_position.left + 1, top: current_position.top + 1});
+		}
+
+		function _paste_new_box(m) {
+
+			var canvas = document.getElementById("div-canvas");
+			if (canvas == null)
+				return;
+			if (false) {
+				var new_element = document.createElement('div');
+				new_element.id = m.id;
+				new_element.onmouseover = _onmouseover_box;
+				new_element.onmouseout = _onmouseout_box;
+				new_element.className = "div-box";
+				new_element.style.left = "" + m.x + "px";
+				new_element.style.top = "" + m.y + "px";
+				new_element.innerHTML = m.text;
+				canvas.appendChild(new_element);
+			}
+			if (true) {
+				var initial_attributes = {
+					id: m.id,
+					class: "div-box panel",
+					text: m.text,
+					//mouseover: _onmouseover_box,
+					//mouseout: _onmouseout_box,
+					mouseenter: _onmouseover_box,
+					mouseleave: _onmouseout_box
+				};
+				var new_element = $("<div>", initial_attributes);
+				new_element.css({"background-color": m.background_color});
+				new_element.offset({left: m.x, top: m.y});
+				new_element.appendTo(canvas);
+				new_element.fadeIn(1000);
+			}
+		}
+
+		function _on_click_apply() {
+
+			var message_text = _pop_comment_value();
+			if (message_text == "") {
+				return;
+			}
+			_hide_inputbox();
+			if (_dragging_start_position == null) {
+				alert("ASSERTION FAILURE");
+				return;
+			}
+			_broadcast_message(_dragging_start_position.x, _dragging_start_position.y, message_text);
+		}
+		</script>
+	</head>
+	<body style="" onload="javascript: _onload_document();">
+		<form>
+
+			<!-- ========================================================== -->
+			<!-- Navigation -->
+			<!-- ========================================================== -->
+			<nav class="navbar navbar-inverse navbar-fixed-top">
+				<div class="container">
+					<div class="navbar-header">
+						<button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+							<span class="sr-only">Toggle navigation</span>
+							<span class="icon-bar"></span>
+							<span class="icon-bar"></span>
+							<span class="icon-bar"></span>
+						</button>
+						<a class="navbar-brand" href="/">ぺたぺたするやつ</a>
+					</div>
+					<div id="navbar" class="navbar-collapse collapse">
+						<ul class="nav navbar-nav">
+							<li class="active"><a href="/">Home</a></li>
+							<li class="inactive"><a href="/preferences">Preferences</a></li>
+							<li class="dropdown">
+								<a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Dropdown <span class="caret"></span></a>
+								<ul class="dropdown-menu">
+									<li><a href="#">Action</a></li>
+									<li><a href="#">Another action</a></li>
+									<li><a href="#">Something else here</a></li>
+									<li role="separator" class="divider"></li>
+									<li class="dropdown-header">Nav header</li>
+									<li><a href="#">Separated link</a></li>
+									<li><a href="#">One more separated link</a></li>
+								</ul>
+							</li>
+						</ul>
+					</div>
+				</div>
+			</nav>
+
+			<!-- ========================================================== -->
+			<!-- Main Content -->
+			<!-- ========================================================== -->
+			<div class="container div-main-container" role="main" style="">
+				<div id="div-sessions" style="">
+					<div id="div-current-sessions">0</div>
+				</div>
+				<div style="height: 100%; width: 100%; overflow: auto; -webkit-overflow-scrolling: touch; border-style: solid; border-width: 1px; border-color: #909090">
+					<div id="div-canvas" class="div-canvas">
+					</div>
+				</div>
+			</div>
+
+			<footer class="footer navbar-fixed-bottom" style="background-color: #e0e0e0">
+				<div class="container" style="line-height: 50px; height: 50px; vertical-align: middle">
+					<p class="text-muted" style="text-align: center">Fork it on <a href="https://github.com/aklabo/peta2" target="_blank" style="text-decoration: none">GitHub <img src="/static/images/GitHub-Mark-32px.png"></a></p>
+				</div>
+			</footer>
+
+			<!-- ========================================================== -->
+			<!-- Modal -->
+			<!-- ========================================================== -->
+			<div id="myModal" class="modal fade" role="dialog">
+				<div class="modal-dialog">
+					<!-- Modal content-->
+					<div class="modal-content">
+						<div class="modal-header">
+							<button type="button" class="close" data-dismiss="modal" onclick="javascript: _onclick_text_cancel();">&times;</button>
+							<h4 class="modal-title">コメントを入力</h4>
+						</div>
+						<div class="modal-body">
+							<!--p>Some text in the modal.</p-->
+							<!--
+							<div class="form-group">
+								<label for="field-01">title:</label>
+								<input type="text" class="form-control" id="field-01">
+							</div>
+							-->
+							<div class="form-group">
+								<label for="comment">comment:</label>
+								<textarea class="form-control" rows="5" id="comment"></textarea>
+							</div>
+						</div>
+						<div class="modal-footer">
+							<button type="button" class="btn btn-default" data-dismiss="modal"
+									onclick="javascript: _on_click_apply();">apply</button>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<!-- ========================================================== -->
+			<!-- footer -->
+			<!-- ========================================================== -->
+
+			<!-- ========================================================== -->
+			<!-- end -->
+			<!-- ========================================================== -->
+
+		</form>
+	</body>
+</html>
+
