@@ -2,8 +2,7 @@
 # coding: utf-8
 
 # バックグラウンドで実行するには
-# nohup sudo node index.js &
+# nohup sudo node index.js --host 0.0.0.0 --port 8080 &
 
 # デバッグ用にコンソール内で実行するには
-node index.js
-
+node index.js --host 0.0.0.0 --port 8080

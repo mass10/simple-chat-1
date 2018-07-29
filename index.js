@@ -77,6 +77,8 @@ function application() {
 
 		try {
 			var json = _load_json_file("/tmp/.peta2-boxes-data.json");
+			if (json == null)
+				json = {};
 			res.json(json);
 		}
 		catch (err) {
@@ -137,6 +139,27 @@ function application() {
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
 
+function _save_box(m) {
+
+	try {
+		var tree_object = _load_json_file("/tmp/.peta2-boxes-data.json");
+		if (tree_object == null)
+			tree_object = {"data": []};
+		require("json");
+		boxes_array = tree_object["data"];
+		boxes_array.push(m);
+		var fs = require("fs");
+		var json_data = JSON.stringify(tree_object, null, "\t");
+		fs.writeFileSync("/tmp/.peta2-boxes-data.json", json_data, {encoding: "utf-8"});
+		// var json = ("/tmp/.peta2-boxes-data.json");
+		// res.json(json);
+	}
+	catch (err) {
+		console.log(err);
+		console.log("[error] json データの保存に失敗しています。");
+	}
+}
+
 function peer_connection(owner, io, socket) {
 
 	this._owner = owner;
@@ -165,42 +188,18 @@ function peer_connection(owner, io, socket) {
 	socket.on("chat message", this._on_chat_message);
 }
 
-
-
-
-
-
-///////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////
-
-function _save_box(m) {
-
-	try {
-		var tree_object = _load_json_file("/tmp/.peta2-boxes-data.json");
-		require("json");
-		boxes_array = tree_object["data"];
-		boxes_array.push(m);
-		var fs = require("fs");
-		var json_data = JSON.stringify(tree_object, null, "\t");
-		fs.writeFileSync("/tmp/.peta2-boxes-data.json", json_data, {encoding: "utf-8"});
-		// var json = ("/tmp/.peta2-boxes-data.json");
-		// res.json(json);
-	}
-	catch (err) {
-		console.log(err);
-		console.log("[error] json データの保存に失敗しています。");
-	}
-}
-
 function _load_json_file(path) {
 
-	require("json");
-	var fs = require("fs");
-	return JSON.parse(fs.readFileSync(path, "utf-8"));
+	try {
+		require("json");
+		var fs = require("fs");
+		return JSON.parse(fs.readFileSync(path, "utf-8"));
+	}
+	catch (err) {
+		// console.log(err);
+		console.log("[error] json データの読み込みに失敗しています。");
+		return null;
+	}
 }
 
 function _read_commandline_arguments() {
@@ -208,8 +207,8 @@ function _read_commandline_arguments() {
 	const args = require("command-line-args");
 	const def = [
 		{name: "help", alias: "h", type: Boolean},
-		{name: "host", type: String, defaultValue: "0.0.0.0"},
-		{name: "port", alias: "p", type: Number, defaultValue: 8080}
+		{name: "host", type: String, defaultValue: "127.0.0.1"},
+		{name: "port", alias: "p", type: Number, defaultValue: 80}
 	];
 	return args(def);
 }
@@ -230,17 +229,10 @@ function _main() {
 		_usage();
 		return;
 	}
+	console.log(options);
 
 	var app = new application();
 	app.run(options);
 }
 
 _main(process.argv);
-
-
-
-
-
-
-
-
