@@ -17,7 +17,7 @@
   },
   "homepage": "https://github.com/mass10/simple-chat-1#readme",
   "dependencies": {
-    "ejs": "^1.0.0",
+    "ejs": ">=2.5.5",
     "express": "^4.6.1",
     "socket.io": "~1.7.2",
     "websocket": "~1.0.23",
